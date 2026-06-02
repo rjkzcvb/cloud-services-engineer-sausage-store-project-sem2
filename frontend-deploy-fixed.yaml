@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sausage-frontend-sausage-store
+  namespace: r-devops-magistracy-project-2sem-272184471
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sausage-frontend
+  template:
+    metadata:
+      labels:
+        app: sausage-frontend
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html
+        configMap:
+          name: frontend-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sausage-frontend
+  namespace: r-devops-magistracy-project-2sem-272184471
+spec:
+  selector:
+    app: sausage-frontend
+  ports:
+  - port: 80
+    targetPort: 80
