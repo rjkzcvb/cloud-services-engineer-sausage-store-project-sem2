@@ -4,116 +4,84 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 env:
-  SAUSAGE_STORE_NAMESPACE: r-devops-magistracy-project-2sem-272184471
-  KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+  NEXUS_HELM_REPO: ${{ secrets.NEXUS_HELM_REPO }}
+  NEXUS_HELM_REPO_USER: ${{ secrets.NEXUS_HELM_REPO_USER }}
+  NEXUS_HELM_REPO_PASSWORD: ${{ secrets.NEXUS_HELM_REPO_PASSWORD }}
+  NAMESPACE: r-devops-magistracy-project-2sem-272184471
   DOCKER_USER: ${{ secrets.DOCKER_USER }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
   STUDENT_NAME: ${{ secrets.STUDENT_NAME }}
 
 jobs:
-  # Job 1: Сборка и пуш образов в Docker Hub
   build_and_push_to_docker_hub:
     name: Push Docker images to DockerHub
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      
+      - uses: actions/checkout@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
       - name: Build and push Backend
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USER }}/sausage-backend:latest
-            ${{ secrets.DOCKER_USER }}/sausage-backend:${{ github.sha }}
-      
+          tags: ${{ secrets.DOCKER_USER }}/sausage-backend:latest
       - name: Build and push Frontend
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USER }}/sausage-frontend:latest
-            ${{ secrets.DOCKER_USER }}/sausage-frontend:${{ github.sha }}
-      
+          tags: ${{ secrets.DOCKER_USER }}/sausage-frontend:latest
       - name: Build and push Backend-report
         uses: docker/build-push-action@v4
         with:
           context: ./backend-report
           push: true
-          tags: |
-            ${{ secrets.DOCKER_USER }}/sausage-backend-report:latest
-            ${{ secrets.DOCKER_USER }}/sausage-backend-report:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_USER }}/sausage-backend-report:latest
 
-  # Job 2: Деплой в Kubernetes
-  deploy_to_kubernetes:
-    name: Deploy to Kubernetes
+  deploy_helm_chart_to_kubernetes:
+    name: Deploy Helm Chart To Kubernetes
     runs-on: ubuntu-latest
     needs: build_and_push_to_docker_hub
-    
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
       
       - name: Setup Helm
         uses: azure/setup-helm@v3
-        with:
-          version: v3.12.0
       
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
-        with:
-          version: latest
       
-      - name: Create kubeconfig file
+      - name: Create kubeconfig from secret
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          echo '${{ secrets.KUBE_CONFIG }}' | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
+          cat $HOME/.kube/config | head -5
       
-      - name: Test kubectl connection
+      - name: Test connection
         run: |
           kubectl cluster-info
           kubectl get ns
       
-      - name: Deploy with Helm (without creating namespace)
+      - name: Deploy
         run: |
           helm upgrade --install sausage-store ./sausage-store-chart \
-            --namespace ${{ env.SAUSAGE_STORE_NAMESPACE }} \
+            --namespace ${{ env.NAMESPACE }} \
             --set backend.image=${{ secrets.DOCKER_USER }}/sausage-backend \
-            --set backend.tag=${{ github.sha }} \
+            --set backend.tag=latest \
             --set backend-report.image=${{ secrets.DOCKER_USER }}/sausage-backend-report \
-            --set backend-report.tag=${{ github.sha }} \
+            --set backend-report.tag=latest \
             --set frontend.image=${{ secrets.DOCKER_USER }}/sausage-frontend \
-            --set frontend.tag=${{ github.sha }} \
-            --set frontend.ingress.host=front-${{ secrets.STUDENT_NAME }}.2sem.students-projects.ru \
-            --wait --timeout 10m
+            --set frontend.tag=latest \
+            --set frontend.ingress.host=front-${{ secrets.STUDENT_NAME }}.2sem.students-projects.ru
       
-      - name: Verify deployment
-        run: |
-          echo "=== Pods ==="
-          kubectl get pods -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
-          echo "=== Services ==="
-          kubectl get svc -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
-          echo "=== Ingress ==="
-          kubectl get ingress -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
-      
-      - name: Get debug info if failed
-        if: failure()
-        run: |
-          kubectl get events -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
-          kubectl describe pods -n ${{ env.SAUSAGE_STORE_NAMESPACE }} 2>/dev/null || echo "No pods"
+      - name: Verify
+        run: kubectl get pods -n ${{ env.NAMESPACE }}
