@@ -133,3 +133,14 @@ vpa:
   mongodb:
     initJob:
       enabled: true
+
+# VPA settings
+vpa:
+  enabled: true
+  backend:
+    minAllowed:
+      cpu: 200m
+      memory: 200Mi
+    maxAllowed:
+      cpu: 1
+      memory: 1Gi

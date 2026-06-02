@@ -1,4 +1,4 @@
-{{- if .Values.global.vpa.enabled }}
+{{- if .Values.vpa.enabled }}
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
@@ -19,7 +19,9 @@ spec:
     containerPolicies:
     - containerName: backend
       minAllowed:
-        {{- toYaml .Values.global.vpa.backend.minAllowed | nindent 8 }}
+        cpu: {{ .Values.vpa.backend.minAllowed.cpu | default "200m" }}
+        memory: {{ .Values.vpa.backend.minAllowed.memory | default "200Mi" }}
       maxAllowed:
-        {{- toYaml .Values.global.vpa.backend.maxAllowed | nindent 8 }}
+        cpu: {{ .Values.vpa.backend.maxAllowed.cpu | default "1" }}
+        memory: {{ .Values.vpa.backend.maxAllowed.memory | default "1Gi" }}
 {{- end }}
