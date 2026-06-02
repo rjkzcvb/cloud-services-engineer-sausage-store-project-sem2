@@ -3,8 +3,9 @@ FROM nginx:alpine
 # Удаляем дефолтную страницу
 RUN rm -rf /usr/share/nginx/html/*
 
-# Создаем простую HTML страницу с API вызовами
-RUN echo '<!DOCTYPE html>
+# Создаем index.html через cat с heredoc
+RUN cat > /usr/share/nginx/html/index.html << 'HTMLEOF'
+<!DOCTYPE html>
 <html>
 <head>
     <title>Sausage Store</title>
@@ -26,11 +27,11 @@ RUN echo '<!DOCTYPE html>
 <body>
     <div class="container">
         <h1>🌭 Sausage Store</h1>
-        <div id="status" class="status"></div>
-        <div id="products">Loading...</div>
+        <div id="status" class="status">Checking backend...</div>
+        <div id="products">Loading products...</div>
         <div class="cart">
             <h2>Shopping Cart</h2>
-            <div id="cart">Empty</div>
+            <div id="cart">Loading cart...</div>
         </div>
     </div>
 
@@ -106,26 +107,29 @@ RUN echo '<!DOCTYPE html>
         loadCart();
     </script>
 </body>
-</html>' > /usr/share/nginx/html/index.html
+</html>
+HTMLEOF
 
 # Конфиг nginx
-RUN echo 'server { \
-    listen 80; \
-    server_name localhost; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    location /api/ { \
-        proxy_pass http://sausage-backend:8080/; \
-        proxy_set_header Host $host; \
-    } \
-    location /report/ { \
-        proxy_pass http://sausage-backend-report:8081/; \
-        proxy_set_header Host $host; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+RUN cat > /etc/nginx/conf.d/default.conf << 'NGINXEOF'
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /api/ {
+        proxy_pass http://sausage-backend:8080/;
+        proxy_set_header Host $host;
+    }
+    location /report/ {
+        proxy_pass http://sausage-backend-report:8081/;
+        proxy_set_header Host $host;
+    }
+}
+NGINXEOF
 
 EXPOSE 80
 
