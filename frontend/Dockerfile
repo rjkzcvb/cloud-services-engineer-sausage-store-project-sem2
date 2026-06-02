@@ -1,24 +1,30 @@
 # Stage 1: Build
-FROM node:18-alpine AS builder
+FROM node:16-alpine AS builder
 
 WORKDIR /app
 
 # Копируем package.json
 COPY package*.json ./
-RUN npm ci || npm install
+
+# Устанавливаем зависимости
+RUN npm install
 
 # Копируем исходники
 COPY . .
 
-# Собираем
-RUN npm run build -- --prod || npm run build
+# Добавляем переменную окружения для OpenSSL legacy provider
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
+# Собираем приложение
+RUN npm run build -- --prod
 
 # Stage 2: Serve
 FROM nginx:alpine
 
+# Копируем собранный фронтенд
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Конфиг nginx
+# Создаем конфиг nginx
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
@@ -30,10 +36,12 @@ RUN echo 'server { \
     location /api/ { \
         proxy_pass http://sausage-backend:8080/; \
         proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
     } \
     location /report/ { \
         proxy_pass http://sausage-backend-report:8081/; \
         proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
