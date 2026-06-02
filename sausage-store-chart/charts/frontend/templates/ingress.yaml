@@ -1,21 +1,42 @@
----
+{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Release.Name }}-{{ .Chart.Name }}-ingress
+  name: sausage-frontend-ingress-{{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: "nginx"
+  {{- if .Values.ingress.tls.enabled }}
   tls:
-    - hosts:
-        - {{ .Values.ingress.host }}
+  - hosts:
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
   rules:
-    - host: {{ .Values.ingress.host }}
-      http:
-        paths:
-        - path: {{ .Values.ingress.path }}
-          pathType: {{ .Values.ingress.pathType }}
-          backend:
-            service:
-              name: {{ .Release.Name }}-{{ .Chart.Name }}-service
-              port:
-                number: {{ .Values.service.port }}
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: sausage-frontend
+            port:
+              number: {{ .Values.service.port }}
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: sausage-backend
+            port:
+              number: 8080
+      - path: /report
+        pathType: Prefix
+        backend:
+          service:
+            name: sausage-backend-report
+            port:
+              number: 8081
+{{- end }}

@@ -9,74 +9,149 @@ env:
   NEXUS_HELM_REPO: ${{ secrets.NEXUS_HELM_REPO }}
   NEXUS_HELM_REPO_USER: ${{ secrets.NEXUS_HELM_REPO_USER }}
   NEXUS_HELM_REPO_PASSWORD: ${{ secrets.NEXUS_HELM_REPO_PASSWORD }}
-  SAUSAGE_STORE_NAMESPACE: YOUR_NAMESPACE
+  SAUSAGE_STORE_NAMESPACE: r-devops-magistracy-project-2sem-272184471
   KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
   VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+  DOCKER_USER: ${{ secrets.DOCKER_USER }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
 jobs:
-  # Сборка и пуш образов в докерхаб:
+  # Job 1: Сборка и пуш образов в Docker Hub
   build_and_push_to_docker_hub:
-      name: Push Docker image to DockerHub
-      runs-on: ubuntu-latest
-      steps:
-        - name: Check out the repo
-          # Получение исходного кода из репозитория:
-          uses: actions/checkout@v3
-        - name: Set up Docker Buildx
-          # Установка сборщика контейнеров Docker:
-          uses: docker/setup-buildx-action@v2
-        - name: Login to Docker 
-          # Авторизация на Docker Hub:
-          uses: docker/login-action@v2
-          # При помощи with передаём в action параметры username и password:
-          with:
-            username: ${{ secrets.DOCKER_USER }}
-            password: ${{ secrets.DOCKER_PASSWORD }}
-            # Хорошо ли держать логин и пароль прямо в коде workflow?
-            # Нет, это нехорошо. Хранить пароль надо в Secrets.
-        - name: Push Backend to DockerHub
-          # Одновременный билд и пуш образа в Docker Hub:
-          uses: docker/build-push-action@v4
-          with:
-            # Параметр context: ./backend/ указывает, что нужный Dockerfile 
-            # находится в ./backend/
-            context: ./backend/
-            # Параметр push: true указывает, что образ нужно не только собрать,
-            # но и отправить на Docker Hub:
-            push: true
-            # В параметре tags задаётся название и тег для образа.
-            # Для каждого пересобранного образа 
-            # устанавливаем тег latest, чтобы потом
-            # на сервере и в docker-compose.yml не указывать версию образа:
-            tags: YOUR_DOCKERHUB/sausage-backend:latest
-            build-args: |
-              VERSION=${{ github.sha }}
-        - name: Push Frontend to DockerHub
-          uses: docker/build-push-action@v4
-          with:
-            context: ./frontend/
-            push: true
-            tags: YOUR_DOCKERHUB/sausage-frontend:latest
-        - name: Push Backend-report to DockerHub
-          uses: docker/build-push-action@v4
-          with:
-            context: ./backend-report/
-            push: true
-            tags: YOUR_DOCKERHUB/sausage-backend-report:latest
-  # Упаковываем helm-чарт и пушим его в Nexus
+    name: Push Docker images to DockerHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Push Backend to DockerHub
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USER }}/sausage-backend:latest
+            ${{ secrets.DOCKER_USER }}/sausage-backend:${{ github.sha }}
+      
+      - name: Push Frontend to DockerHub
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend/
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USER }}/sausage-frontend:latest
+            ${{ secrets.DOCKER_USER }}/sausage-frontend:${{ github.sha }}
+      
+      - name: Push Backend-report to DockerHub
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend-report/
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USER }}/sausage-backend-report:latest
+            ${{ secrets.DOCKER_USER }}/sausage-backend-report:${{ github.sha }}
+
+  # Job 2: Упаковываем helm-чарт и пушим его в Nexus
   add_helm_chart_to_nexus:
-      name: Add Helm Chart To Nexus
-      runs-on: ubuntu-latest
-      needs: build_and_push_to_docker_hub
+    name: Add Helm Chart To Nexus
+    runs-on: ubuntu-latest
+    needs: build_and_push_to_docker_hub
 
-      steps:
-      #### Опишите необходимые шаги
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+      
+      - name: Package Helm chart
+        run: |
+          cd sausage-store-chart
+          helm package . --version 0.1.0 --app-version ${{ github.sha }}
+      
+      - name: Add Helm repo and push to Nexus
+        run: |
+          helm repo add nexus ${{ env.NEXUS_HELM_REPO }} \
+            --username ${{ env.NEXUS_HELM_REPO_USER }} \
+            --password ${{ env.NEXUS_HELM_REPO_PASSWORD }}
+          helm repo update
+          curl -v -u ${{ env.NEXUS_HELM_REPO_USER }}:${{ env.NEXUS_HELM_REPO_PASSWORD }} \
+            --upload-file ./sausage-store-chart/sausage-store-0.1.0.tgz \
+            ${{ env.NEXUS_HELM_REPO }}/sausage-store-0.1.0.tgz
 
-  # Деплоим приложения в кластер Kubernetes с помощью helm-чарт
+  # Job 3: Деплоим приложения в кластер Kubernetes
   deploy_helm_chart_to_kubernetes:
-      name: Deploy Helm Chart To Kubernetes
-      runs-on: ubuntu-latest
-      needs: add_helm_chart_to_nexus
+    name: Deploy Helm Chart To Kubernetes
+    runs-on: ubuntu-latest
+    needs: add_helm_chart_to_nexus
 
-      steps:
-      #### Опишите необходимые шаги
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+      
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ env.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+      
+      - name: Add Nexus Helm repo
+        run: |
+          helm repo add nexus ${{ env.NEXUS_HELM_REPO }} \
+            --username ${{ env.NEXUS_HELM_REPO_USER }} \
+            --password ${{ env.NEXUS_HELM_REPO_PASSWORD }}
+          helm repo update
+      
+      - name: Deploy to Kubernetes
+        run: |
+          helm upgrade --install sausage-store nexus/sausage-store \
+            --namespace ${{ env.SAUSAGE_STORE_NAMESPACE }} \
+            --create-namespace \
+            --set backend.image=${{ secrets.DOCKER_USER }}/sausage-backend \
+            --set backend.tag=${{ github.sha }} \
+            --set backend-report.image=${{ secrets.DOCKER_USER }}/sausage-backend-report \
+            --set backend-report.tag=${{ github.sha }} \
+            --set frontend.image=${{ secrets.DOCKER_USER }}/sausage-frontend \
+            --set frontend.tag=${{ github.sha }} \
+            --set frontend.ingress.host=front-${{ secrets.STUDENT_NAME }}.2sem.students-projects.ru \
+            --wait --timeout 10m
+      
+      - name: Verify deployment
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
+          echo "=== Services ==="
+          kubectl get svc -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
+          echo "=== Ingress ==="
+          kubectl get ingress -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
+          echo "=== HPA ==="
+          kubectl get hpa -n ${{ env.SAUSAGE_STORE_NAMESPACE }} || echo "No HPA found"
+          echo "=== VPA ==="
+          kubectl get vpa -n ${{ env.SAUSAGE_STORE_NAMESPACE }} || echo "No VPA found"
+      
+      - name: Get pods status if failed
+        if: failure()
+        run: |
+          kubectl describe pods -n ${{ env.SAUSAGE_STORE_NAMESPACE }}
+          kubectl logs -n ${{ env.SAUSAGE_STORE_NAMESPACE }} --all-containers --prefix

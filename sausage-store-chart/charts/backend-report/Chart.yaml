@@ -1,6 +1,6 @@
 apiVersion: v2
-name: infra
-description: Infrastructure (PostgreSQL, MongoDB)
+name: backend-report
+description: Sausage Store Backend Report
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

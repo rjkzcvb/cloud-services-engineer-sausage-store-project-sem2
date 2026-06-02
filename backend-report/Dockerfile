@@ -1,32 +1,33 @@
-# Start from the latest golang base image
-FROM golang:latest as builder
+FROM golang:1.19-alpine AS builder
 
-# Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
+# Копируем все .go файлы
+COPY *.go ./
 
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
+# Инициализируем go module если нет
+RUN if [ ! -f go.mod ]; then \
+        go mod init sausage-backend-report; \
+        go get github.com/gorilla/mux; \
+        go get go.mongodb.org/mongo-driver/mongo; \
+        go get go.mongodb.org/mongo-driver/mongo/options; \
+        go mod tidy; \
+    fi
+
+# Скачиваем зависимости
 RUN go mod download
 
-# Copy the source from the current directory to the Working Directory inside the container
-COPY . .
+# Собираем
+RUN CGO_ENABLED=0 GOOS=linux go build -o backend-report .
 
-# Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+FROM alpine:latest
 
-
-######## Start a new stage from scratch #######
-FROM alpine:latest  
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Copy the Pre-built binary file from the previous stage
-COPY --from=builderer /app/main .
+COPY --from=builder /app/backend-report .
 
-# Expose port 8080 to the outside world
-EXPOSE 8080
+EXPOSE 8081
 
-# Command to run the executable
-CMD ["/app/main"] 
+CMD ["./backend-report"]

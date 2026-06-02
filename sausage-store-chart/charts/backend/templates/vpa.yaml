@@ -1,0 +1,25 @@
+{{- if .Values.global.vpa.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: sausage-backend-vpa-{{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: sausage-backend
+    app.kubernetes.io/name: sausage-backend
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: sausage-backend-{{ .Release.Name }}
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: backend
+      minAllowed:
+        {{- toYaml .Values.global.vpa.backend.minAllowed | nindent 8 }}
+      maxAllowed:
+        {{- toYaml .Values.global.vpa.backend.maxAllowed | nindent 8 }}
+{{- end }}
