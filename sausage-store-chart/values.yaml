@@ -1,20 +1,18 @@
-global:
-  imageRegistry: docker.io
-  namespace: r-devops-magistracy-project-2sem-272184471
+environment: production
 
 backend:
   enabled: true
-  image: rjkzcvb/sausage-backend
+  image: sausage-backend
   tag: latest
-  replicas: 2
+  replicas: 1
   port: 8080
   resources:
     requests:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "128Mi"
+      cpu: "100m"
     limits:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "256Mi"
+      cpu: "200m"
   service:
     type: ClusterIP
     port: 8080
@@ -38,36 +36,10 @@ backend:
 
 backend-report:
   enabled: true
-  image: rjkzcvb/sausage-backend-report
+  image: sausage-backend-report
   tag: latest
   replicas: 1
   port: 8081
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  service:
-    type: ClusterIP
-    port: 8081
-  strategy:
-    type: Recreate
-  mongodb:
-    uri: mongodb://mongodb:27017/reports
-  hpa:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 75
-
-frontend:
-  enabled: true
-  image: rjkzcvb/sausage-frontend
-  tag: latest
-  replicas: 1
-  port: 80
   resources:
     requests:
       memory: "64Mi"
@@ -75,6 +47,27 @@ frontend:
     limits:
       memory: "128Mi"
       cpu: "100m"
+  service:
+    type: ClusterIP
+    port: 8081
+  strategy:
+    type: Recreate
+  mongodb:
+    uri: mongodb://mongodb:27017/reports
+
+frontend:
+  enabled: true
+  image: sausage-frontend
+  tag: latest
+  replicas: 1
+  port: 80
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "25m"
+    limits:
+      memory: "64Mi"
+      cpu: "50m"
   service:
     type: ClusterIP
     port: 80
@@ -94,15 +87,14 @@ infra:
     username: sausage_user
     password: sausage_password
     storage:
-      size: 10Gi
-      storageClass: yc-network-hdd
+      size: 1Gi
     resources:
       requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
         memory: "256Mi"
         cpu: "200m"
-      limits:
-        memory: "512Mi"
-        cpu: "400m"
   mongodb:
     image: mongo:6
     port: 27017
@@ -110,37 +102,16 @@ infra:
     username: report_user
     password: report_password
     storage:
-      size: 5Gi
-      storageClass: yc-network-hdd
+      size: 1Gi
     resources:
       requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
         memory: "256Mi"
         cpu: "200m"
-      limits:
-        memory: "512Mi"
-        cpu: "400m"
-
-vpa:
-  enabled: true
-  backend:
-    minAllowed:
-      cpu: 200m
-      memory: 200Mi
-    maxAllowed:
-      cpu: 1
-      memory: 1Gi
-
-  mongodb:
     initJob:
-      enabled: true
+      enabled: false
 
-# VPA settings
 vpa:
-  enabled: true
-  backend:
-    minAllowed:
-      cpu: 200m
-      memory: 200Mi
-    maxAllowed:
-      cpu: 1
-      memory: 1Gi
+  enabled: false
