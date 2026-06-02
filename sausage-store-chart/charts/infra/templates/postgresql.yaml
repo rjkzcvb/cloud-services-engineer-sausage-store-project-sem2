@@ -1,10 +1,9 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: postgresql
   namespace: {{ .Release.Namespace }}
 spec:
-  serviceName: postgresql
   replicas: 1
   selector:
     matchLabels:
@@ -16,9 +15,9 @@ spec:
     spec:
       containers:
       - name: postgresql
-        image: {{ .Values.postgresql.image }}
+        image: postgres:15-alpine
         ports:
-        - containerPort: {{ .Values.postgresql.port }}
+        - containerPort: 5432
         env:
         - name: POSTGRES_DB
           value: {{ .Values.postgresql.database }}
@@ -26,17 +25,13 @@ spec:
           value: {{ .Values.postgresql.username }}
         - name: POSTGRES_PASSWORD
           value: {{ .Values.postgresql.password }}
-        volumeMounts:
-        - name: postgresql-storage
-          mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-  - metadata:
-      name: postgresql-storage
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 500Mi
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
 ---
 apiVersion: v1
 kind: Service

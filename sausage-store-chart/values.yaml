@@ -86,8 +86,6 @@ infra:
     database: sausage_store
     username: sausage_user
     password: sausage_password
-    storage:
-      size: 1Gi
     resources:
       requests:
         memory: "128Mi"
@@ -101,8 +99,6 @@ infra:
     database: reports
     username: report_user
     password: report_password
-    storage:
-      size: 1Gi
     resources:
       requests:
         memory: "128Mi"
