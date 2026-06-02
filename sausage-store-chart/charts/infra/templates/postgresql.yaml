@@ -1,31 +1,8 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgresql-pvc-{{ .Release.Name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app: postgresql
-    app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: sausage-store
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ .Values.postgresql.storage.size }}
-  {{- if .Values.postgresql.storage.storageClass }}
-  storageClassName: {{ .Values.postgresql.storage.storageClass }}
-  {{- end }}
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
   namespace: {{ .Release.Namespace }}
-  labels:
-    app: postgresql
-    app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: sausage-store
 spec:
   serviceName: postgresql
   replicas: 1
@@ -42,7 +19,6 @@ spec:
         image: {{ .Values.postgresql.image }}
         ports:
         - containerPort: {{ .Values.postgresql.port }}
-          name: postgres
         env:
         - name: POSTGRES_DB
           value: {{ .Values.postgresql.database }}
@@ -53,32 +29,24 @@ spec:
         volumeMounts:
         - name: postgresql-storage
           mountPath: /var/lib/postgresql/data
-        resources:
-          {{- toYaml .Values.postgresql.resources | nindent 10 }}
   volumeClaimTemplates:
   - metadata:
       name: postgresql-storage
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      {{- if .Values.postgresql.storage.storageClass }}
-      storageClassName: {{ .Values.postgresql.storage.storageClass }}
-      {{- end }}
       resources:
         requests:
-          storage: {{ .Values.postgresql.storage.size }}
+          storage: 500Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgresql
   namespace: {{ .Release.Namespace }}
-  labels:
-    app: postgresql
 spec:
   type: ClusterIP
   ports:
   - port: {{ .Values.postgresql.port }}
     targetPort: {{ .Values.postgresql.port }}
-    name: postgres
   selector:
     app: postgresql
