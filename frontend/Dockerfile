@@ -3,18 +3,22 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Копируем package.json
 COPY package*.json ./
-RUN npm ci
+RUN npm ci || npm install
 
+# Копируем исходники
 COPY . .
-RUN npm run build --prod
 
-# Stage 2: Serve with nginx
+# Собираем
+RUN npm run build -- --prod || npm run build
+
+# Stage 2: Serve
 FROM nginx:alpine
 
-COPY --from=builder /app/dist/sausage-store /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Создаем конфиг nginx
+# Конфиг nginx
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
