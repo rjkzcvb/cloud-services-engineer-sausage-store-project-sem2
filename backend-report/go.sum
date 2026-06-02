@@ -1,4 +1,0 @@
-github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2vN39hVdA8lwC83xPn+dD7wZwJL4jXfs=
-github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
-go.mongodb.org/mongo-driver v1.12.0 h1:V+v9DvocBtpmAp/9kLkhJSmwqZq0oL93Fj77u+6sLxc=
-go.mongodb.org/mongo-driver v1.12.0/go.mod h1:AZkxhPnFJUoH7kZlFkVKucV20KypT5LyVyYI/LTvqOQ=

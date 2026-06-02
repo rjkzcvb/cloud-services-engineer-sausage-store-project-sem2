@@ -1,21 +1,13 @@
-FROM golang:1.19-alpine AS builder
+FROM golang:1.19-alpine
 
 WORKDIR /app
 
-# Устанавливаем git (нужен для go mod)
-RUN apk add --no-cache git
+COPY go.mod go.sum* ./
+RUN go mod init backend-report 2>/dev/null || true
 
-# Копируем go.mod и go.sum
-COPY go.mod go.sum ./
+COPY *.go ./
 
-# Скачиваем зависимости
-RUN go mod download
-
-# Копируем исходники
-COPY . .
-
-# Собираем приложение
-RUN CGO_ENABLED=0 GOOS=linux go build -o backend-report .
+RUN go build -o backend-report .
 
 FROM alpine:latest
 
@@ -23,7 +15,7 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-COPY --from=builder /app/backend-report .
+COPY --from=0 /app/backend-report .
 
 EXPOSE 8081
 
